@@ -1,8 +1,11 @@
 import os
+import sys
+from pathlib import Path
 
 import pytest
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+sys.path.insert(0, str(Path(__file__).parent))
 
 
 @pytest.fixture(scope="session")

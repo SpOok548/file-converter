@@ -116,6 +116,7 @@ class MainWindow(QMainWindow):
         self.table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self.table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self.table.cellDoubleClicked.connect(self._open_result)
+        self.table.currentCellChanged.connect(self._show_row_details)
         root.addWidget(self.table, 1)
 
         file_row = QHBoxLayout()
@@ -251,6 +252,7 @@ class MainWindow(QMainWindow):
 
     def _on_failed(self, row: int, message: str) -> None:
         entry = self.entries[row]
+        self._bar(entry).setValue(0)
         self._set_status(entry, "Failed")
         self.table.item(row, COL_STATUS).setToolTip(message)
         self._job_ended(row)
@@ -262,7 +264,7 @@ class MainWindow(QMainWindow):
             failed = sum(e.status == "Failed" for e in self.entries)
             msg = f"Finished: {done} converted"
             if failed:
-                msg += f", {failed} failed (hover the status to see why)"
+                msg += f", {failed} failed (click a file to see why)"
             self.statusBar().showMessage(msg)
         self._update_buttons()
 
@@ -270,6 +272,12 @@ class MainWindow(QMainWindow):
         entry = self.entries[row]
         if entry.output and entry.output.exists():
             QDesktopServices.openUrl(QUrl.fromLocalFile(str(entry.output)))
+
+    def _show_row_details(self, row: int, *_args) -> None:
+        if 0 <= row < len(self.entries):
+            detail = self.table.item(row, COL_STATUS).toolTip()
+            if detail:
+                self.statusBar().showMessage(detail)
 
     # ---- helpers ---------------------------------------------------------
 

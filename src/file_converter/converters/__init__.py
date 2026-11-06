@@ -13,7 +13,13 @@ from file_converter.converters.base import (
 
 def default_registry() -> ConverterRegistry:
     """The registry the app uses. Real converters are registered here as they are added."""
-    return ConverterRegistry()
+    from file_converter.converters.pdf_to_excel import PdfToExcel
+    from file_converter.converters.pdf_to_word import PdfToWord
+
+    registry = ConverterRegistry()
+    registry.register(PdfToWord())
+    registry.register(PdfToExcel())
+    return registry
 
 
 __all__ = [
