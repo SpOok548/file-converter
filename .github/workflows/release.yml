@@ -1,0 +1,110 @@
+name: Build installers
+
+# Push a tag like v0.2.0 to build installers for every platform and publish them
+# as a GitHub Release. "Run workflow" on the Actions tab builds them without releasing.
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+  pull_request:
+    paths: ["packaging/**", ".github/workflows/release.yml"]
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            name: windows
+          - os: macos-latest
+            name: macos
+          - os: ubuntu-22.04  # older glibc so the AppImage runs on more Linux versions
+            name: linux
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Linux build libraries
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libegl1 libgl1 libxkbcommon0 libxkbcommon-x11-0 libfontconfig1 libdbus-1-3 libfuse2 desktop-file-utils
+
+      - name: Install app and PyInstaller
+        run: |
+          pip install . pyinstaller pillow
+          echo "VERSION=$(python -c 'import file_converter; print(file_converter.__version__)')" >> "$GITHUB_ENV"
+
+      - name: Build app with PyInstaller
+        run: pyinstaller --noconfirm packaging/file_converter.spec
+
+      - name: Smoke test the built app
+        run: |
+          python -c "import sys; sys.path.insert(0, 'tests'); from pathlib import Path; from pdf_samples import ruled_table_pdf; ruled_table_pdf(Path('smoke.pdf'))"
+          if [ "$RUNNER_OS" = "macOS" ]; then
+            BIN="dist/File Converter.app/Contents/MacOS/File Converter"
+          elif [ "$RUNNER_OS" = "Windows" ]; then
+            BIN="dist/File Converter/File Converter.exe"
+          else
+            BIN="dist/File Converter/File Converter"
+          fi
+          "$BIN" --convert smoke.pdf --to xlsx --output smoke.xlsx
+          "$BIN" --convert smoke.pdf --to docx --output smoke.docx
+          "$BIN" --convert smoke.pdf --to compress --output smoke-small.pdf
+          "$BIN" --convert smoke.pdf --to png --output smoke-pages
+          test -s smoke.xlsx && test -s smoke.docx && test -s smoke-small.pdf && ls smoke-pages/*.png
+
+      - name: Make Windows installer
+        if: runner.os == 'Windows'
+        run: |
+          python -c "from PIL import Image; Image.open('packaging/icon.png').save('packaging/windows/icon.ico', sizes=[(16,16),(32,32),(48,48),(64,64),(128,128),(256,256)])"
+          choco install innosetup -y --no-progress
+          "/c/Program Files (x86)/Inno Setup 6/ISCC.exe" "//DAppVersion=$VERSION" packaging/windows/installer.iss
+          echo "ASSET=dist/FileConverter-Setup-$VERSION.exe" >> "$GITHUB_ENV"
+
+      - name: Make macOS disk image
+        if: runner.os == 'macOS'
+        run: |
+          mkdir -p build/dmg
+          cp -R "dist/File Converter.app" build/dmg/
+          ln -s /Applications build/dmg/Applications
+          hdiutil create -volname "File Converter" -srcfolder build/dmg -ov -format UDZO "dist/FileConverter-$VERSION-macOS.dmg"
+          echo "ASSET=dist/FileConverter-$VERSION-macOS.dmg" >> "$GITHUB_ENV"
+
+      - name: Make Linux AppImage
+        if: runner.os == 'Linux'
+        run: |
+          packaging/linux/build_appimage.sh "$VERSION"
+          echo "ASSET=dist/FileConverter-$VERSION-x86_64.AppImage" >> "$GITHUB_ENV"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: installer-${{ matrix.name }}
+          path: ${{ env.ASSET }}
+          if-no-files-found: error
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: installers
+          merge-multiple: true
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" installers/* \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "File Converter $GITHUB_REF_NAME" \
+            --notes "Download the installer for your computer below: **.exe** for Windows, **.dmg** for Mac, **.AppImage** for Linux."

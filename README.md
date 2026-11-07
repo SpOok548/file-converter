@@ -14,7 +14,7 @@ An offline desktop app for Windows, macOS and Linux that converts PDFs and image
 | PDF → JPG / PNG | ✅ One image per page, 72, 150 or 300 dpi |
 | Extract images from PDF | ✅ Original quality |
 | Image / scanned PDF → Word or Excel (OCR) | Planned (step 3) |
-| Installers for Windows, macOS, Linux | Planned (step 4) |
+| Installers for Windows, macOS, Linux | ✅ Built automatically, see below |
 
 ### PDF tools
 
@@ -28,6 +28,28 @@ An offline desktop app for Windows, macOS and Linux that converts PDFs and image
 Pick a tool, fill in its options, and press **Start**. Every tool saves a new file (or folder) next to the original, such as `report (rotated).pdf`; originals are never changed. Tools that take page numbers accept ranges like `1-3, 5, 8-`, and blank means every page.
 
 Scanned PDFs, password-protected PDFs and PDFs without tables (for Excel) are rejected with a clear message. Click a failed file to see why.
+
+## Install
+
+Download the latest installer from the [Releases page](https://github.com/SpOok548/file-converter/releases/latest):
+
+- **Windows:** `FileConverter-Setup-<version>.exe`. Run it and follow the steps. Windows may show "Windows protected your PC" because the installer isn't code-signed yet; click **More info → Run anyway**.
+- **macOS (Apple Silicon):** `FileConverter-<version>-macOS.dmg`. Open it and drag File Converter into Applications. The first time, right-click the app and choose **Open**, because it isn't notarized by Apple yet.
+- **Linux:** `FileConverter-<version>-x86_64.AppImage`. Make it executable (`chmod +x`) and double-click it.
+
+## Make a new release
+
+1. Bump `__version__` in `src/file_converter/__init__.py` and `version` in `pyproject.toml`.
+2. Tag and push: `git tag v0.2.0 && git push origin v0.2.0`.
+3. GitHub Actions builds all three installers, tests that each one converts a PDF, and publishes them as a release.
+
+To build installers without releasing, open **Actions → Build installers → Run workflow**.
+
+## Command line
+
+```bash
+file-converter --convert report.pdf --to xlsx --output report.xlsx
+```
 
 ## Run from source
 

@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=File Converter
+Comment=Convert PDFs and images to Word and Excel, offline
+Exec=file-converter %F
+Icon=file-converter
+Categories=Office;Utility;
+MimeType=application/pdf;image/png;image/jpeg;image/tiff;image/bmp;image/webp;
+Terminal=false
