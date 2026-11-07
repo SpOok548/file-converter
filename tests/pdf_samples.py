@@ -54,3 +54,52 @@ def password_pdf(path: Path) -> Path:
     doc.new_page().insert_text((72, 72), "secret")
     doc.save(path, encryption=pymupdf.PDF_ENCRYPT_AES_256, user_pw="pw", owner_pw="pw")
     return path
+
+
+def numbered_pdf(path: Path, pages: int = 5) -> Path:
+    """A PDF whose pages say "Page 1", "Page 2", ... so tests can tell them apart."""
+    doc = pymupdf.open()
+    for n in range(1, pages + 1):
+        doc.new_page().insert_text((72, 72), f"Page {n}", fontsize=14)
+    doc.save(path)
+    return path
+
+
+def page_texts(path: Path, password: str | None = None) -> list[str]:
+    doc = pymupdf.open(path)
+    if password:
+        doc.authenticate(password)
+    with doc:
+        return [page.get_text().strip() for page in doc]
+
+
+def photo_pdf(path: Path) -> Path:
+    """One page holding a large, noisy photo-like image, so compression has something to do."""
+    import random
+
+    from PIL import Image
+
+    rng = random.Random(1)
+    image = Image.new("RGB", (1600, 1200))
+    image.putdata([(rng.randrange(256), rng.randrange(256), rng.randrange(256)) for _ in range(1600 * 1200)])
+    doc = pymupdf.open()
+    page = doc.new_page()
+    buffer = __import__("io").BytesIO()
+    image.save(buffer, "PNG")
+    page.insert_image(page.rect, stream=buffer.getvalue())
+    doc.save(path)
+    return path
+
+
+def form_pdf(path: Path) -> Path:
+    doc = pymupdf.open()
+    page = doc.new_page()
+    widget = pymupdf.Widget()
+    widget.field_type = pymupdf.PDF_WIDGET_TYPE_TEXT
+    widget.field_name = "name"
+    widget.field_value = "Ada"
+    widget.rect = pymupdf.Rect(72, 72, 300, 100)
+    page.add_widget(widget)
+    page.add_text_annot((72, 200), "A sticky note")
+    doc.save(path)
+    return path
