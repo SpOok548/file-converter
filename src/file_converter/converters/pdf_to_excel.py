@@ -43,7 +43,7 @@ class PdfToExcel(Converter):
     input_extensions = frozenset({".pdf"})
     output_format = EXCEL
 
-    def convert(self, source: Path, destination: Path, progress: ProgressCallback) -> None:
+    def convert(self, source: Path, destination: Path, progress: ProgressCallback, options=None) -> None:
         info = inspect_pdf(source)
         if not info.has_text:
             raise ConversionError(SCANNED_MESSAGE)

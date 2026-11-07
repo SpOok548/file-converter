@@ -7,7 +7,7 @@ class FakePdfToWord(Converter):
     input_extensions = frozenset({".pdf"})
     output_format = WORD
 
-    def convert(self, source, destination, progress):
+    def convert(self, source, destination, progress, options=None):
         destination.write_text("ok")
 
 

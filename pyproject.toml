@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "file-converter"
 version = "0.1.0"
-description = "Offline desktop app for converting PDFs and images to Word and Excel"
+description = "Offline desktop app for converting PDFs and images, plus everyday PDF tools"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
@@ -13,6 +13,9 @@ dependencies = [
     "pdf2docx>=0.5.8",
     "pdfplumber>=0.11",
     "openpyxl>=3.1",
+    "PyMuPDF>=1.26",
+    "Pillow>=10",
+    "pillow-heif>=0.18",
 ]
 
 [project.optional-dependencies]
