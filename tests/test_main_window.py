@@ -133,3 +133,58 @@ def test_remove_selected(qapp, tmp_path):
     w.remove_selected()
     assert [e.path.name for e in w.entries] == ["a.pdf", "c.pdf"]
     assert w.table.rowCount() == 2
+
+
+# ---- drag and drop ----------------------------------------------------------
+
+from PySide6.QtCore import QMimeData, QPoint, QPointF, Qt, QUrl  # noqa: E402
+from PySide6.QtGui import QDragEnterEvent, QDropEvent  # noqa: E402
+from PySide6.QtWidgets import QApplication, QWidget  # noqa: E402
+
+
+def _mime(paths):
+    mime = QMimeData()
+    mime.setUrls([QUrl.fromLocalFile(str(p)) for p in paths])
+    return mime
+
+
+def _drop_target(widget: QWidget) -> QWidget | None:
+    """The widget Qt delivers a drop to: the first one up the parent chain
+    that accepts drops."""
+    while widget is not None and not widget.acceptDrops():
+        widget = widget.parentWidget()
+    return widget
+
+
+def test_drops_anywhere_on_window_reach_the_window(qapp):
+    w = make_window(qapp)
+    for child in (w.drop_area, w.table.viewport(), w.convert_button, w.action_combo):
+        assert _drop_target(child) is w
+
+
+def test_drop_adds_files_and_folders(qapp, tmp_path):
+    w = make_window(qapp)
+    pdf = tmp_path / "a.pdf"
+    pdf.write_text("x")
+    folder = tmp_path / "more"
+    folder.mkdir()
+    (folder / "b.pdf").write_text("x")
+    (folder / "notes.txt").write_text("x")
+    mime = _mime([pdf, folder])
+    actions = Qt.DropAction.CopyAction
+    enter = QDragEnterEvent(QPoint(10, 10), actions, mime, Qt.MouseButton.LeftButton, Qt.KeyboardModifier.NoModifier)
+    QApplication.sendEvent(w, enter)
+    assert enter.isAccepted()
+    drop = QDropEvent(QPointF(10, 10), actions, mime, Qt.MouseButton.LeftButton, Qt.KeyboardModifier.NoModifier)
+    QApplication.sendEvent(w, drop)
+    assert drop.isAccepted()
+    assert [e.path.name for e in w.entries] == ["a.pdf", "b.pdf"]
+
+
+def test_drag_without_files_is_refused(qapp):
+    w = make_window(qapp)
+    mime = QMimeData()
+    mime.setText("hello")
+    enter = QDragEnterEvent(QPoint(10, 10), Qt.DropAction.CopyAction, mime, Qt.MouseButton.LeftButton, Qt.KeyboardModifier.NoModifier)
+    QApplication.sendEvent(w, enter)
+    assert not enter.isAccepted()
