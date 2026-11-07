@@ -38,4 +38,6 @@ Name: "{group}\Uninstall File Converter"; Filename: "{uninstallexe}"
 Name: "{autodesktop}\File Converter"; Filename: "{app}\File Converter.exe"; Tasks: desktopicon
 
 [Run]
-Filename: "{app}\File Converter.exe"; Description: "Open File Converter now"; Flags: nowait postinstall skipifsilent
+; runasoriginaluser: never start the app elevated after an admin install.
+; Windows blocks drag and drop from Explorer into elevated apps.
+Filename: "{app}\File Converter.exe"; Description: "Open File Converter now"; Flags: nowait postinstall skipifsilent runasoriginaluser
