@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from PySide6.QtCore import Qt, QThreadPool, QUrl
-from PySide6.QtGui import QDesktopServices, QDragEnterEvent, QDropEvent
+from PySide6.QtGui import QDesktopServices, QDragEnterEvent, QDragMoveEvent, QDropEvent
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QCheckBox,
@@ -48,18 +48,22 @@ class FileEntry:
 
 
 class DropArea(QFrame):
-    def __init__(self, on_files, parent: QWidget | None = None) -> None:
+    """The dashed "drop here" banner. Drops are handled by the whole window
+    (see MainWindow.dropEvent); this widget only shows the highlight."""
+
+    def __init__(self, on_click=None, parent: QWidget | None = None) -> None:
         super().__init__(parent)
-        self._on_files = on_files
-        self.setAcceptDrops(True)
+        self._on_click = on_click
         self.setObjectName("dropArea")
         self.setMinimumHeight(96)
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.setToolTip("Drop files anywhere on this window, or click to browse")
         self.setStyleSheet(
             "#dropArea { border: 2px dashed palette(mid); border-radius: 10px; }"
             "#dropArea[hover=\"true\"] { border-color: palette(highlight); }"
         )
         layout = QVBoxLayout(self)
-        title = QLabel("Drop PDFs or images here")
+        title = QLabel("Drop PDFs or images here, or click to browse")
         title.setAlignment(Qt.AlignmentFlag.AlignCenter)
         font = title.font()
         font.setPointSizeF(font.pointSizeF() * 1.3)
@@ -72,24 +76,21 @@ class DropArea(QFrame):
         layout.addWidget(hint)
         layout.addStretch()
 
-    def _set_hover(self, on: bool) -> None:
+    def set_hover(self, on: bool) -> None:
         self.setProperty("hover", on)
         self.style().unpolish(self)
         self.style().polish(self)
 
-    def dragEnterEvent(self, event: QDragEnterEvent) -> None:
-        if event.mimeData().hasUrls():
-            event.acceptProposedAction()
-            self._set_hover(True)
+    def mouseReleaseEvent(self, event) -> None:
+        if event.button() == Qt.MouseButton.LeftButton and self._on_click:
+            self._on_click()
+        super().mouseReleaseEvent(event)
 
-    def dragLeaveEvent(self, event) -> None:
-        self._set_hover(False)
 
-    def dropEvent(self, event: QDropEvent) -> None:
-        self._set_hover(False)
-        paths = [Path(u.toLocalFile()) for u in event.mimeData().urls() if u.isLocalFile()]
-        self._on_files(paths)
-        event.acceptProposedAction()
+def _local_paths(mime) -> list[Path]:
+    if not mime.hasUrls():
+        return []
+    return [Path(u.toLocalFile()) for u in mime.urls() if u.isLocalFile() and u.toLocalFile()]
 
 
 class MainWindow(QMainWindow):
@@ -112,7 +113,10 @@ class MainWindow(QMainWindow):
         central = QWidget()
         root = QVBoxLayout(central)
 
-        self.drop_area = DropArea(self.add_files)
+        # The whole window takes dropped files, not just the banner: the file
+        # list fills most of the window and is where people tend to drop.
+        self.setAcceptDrops(True)
+        self.drop_area = DropArea(self._browse_files)
         root.addWidget(self.drop_area)
 
         self.table = QTableWidget(0, 3)
@@ -175,6 +179,33 @@ class MainWindow(QMainWindow):
         self._action_changed()
         self.statusBar().showMessage("Add files to get started. Double-click a finished file to open it.")
         self._update_buttons()
+
+    # ---- drag and drop ---------------------------------------------------
+
+    def dragEnterEvent(self, event: QDragEnterEvent) -> None:
+        if _local_paths(event.mimeData()):
+            event.acceptProposedAction()
+            self.drop_area.set_hover(True)
+        else:
+            event.ignore()
+
+    def dragMoveEvent(self, event: QDragMoveEvent) -> None:
+        if _local_paths(event.mimeData()):
+            event.acceptProposedAction()
+        else:
+            event.ignore()
+
+    def dragLeaveEvent(self, event) -> None:
+        self.drop_area.set_hover(False)
+
+    def dropEvent(self, event: QDropEvent) -> None:
+        self.drop_area.set_hover(False)
+        paths = _local_paths(event.mimeData())
+        if not paths:
+            event.ignore()
+            return
+        event.acceptProposedAction()
+        self.add_files(paths)
 
     # ---- tools and options ----------------------------------------------
 
